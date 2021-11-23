@@ -1,6 +1,6 @@
 # StarGazer
 
-![Maturity level-0](https://img.shields.io/badge/Maturity%20Level-ML--0-red)
+![Maturity level-Prototype](https://img.shields.io/badge/Maturity%20Level-Prototype-red)
 
 StarGazer is a tool designed for rapidly assessing drug repositioning opportunities.It combines multi-source, multi-omics data with a novel target prioritization scoring system in an interactive Python-based Streamlit dashboard. StarGazer displays target prioritization scores for genes associated with 1844 phenotypic traits. 
 
