@@ -122,59 +122,10 @@ def go_enrichment(input_gene):
     rawData = pd.read_csv(io.StringIO(r.decode('utf-8')), sep = "\t")
     return rawData
 
-# initialising app
-path = os.getcwd()
+
     
 ## main page set up
 st.set_page_config(layout="wide", page_title="StarGazer")
-
-# import dataset
-df = pd.read_csv(path + "/assets/phewas-catalog.csv")
-
-# fill na with "Unknown"
-df['gene_name'] = df['gene_name'].fillna("UNKNOWN")
-df_selected = df[["gene_name", "snp", "phewas phenotype", "p-value", "odds-ratio", "gwas-associations"]]
-
-# Adding COVID-19 module
-full_url = "https://www.ebi.ac.uk/gwas/rest/api/efoTraits/MONDO_0100096/associations?projection=associationByEfoTrait"
-r = requests.get(full_url, json={})
-if r.status_code == 200:
-    COVID_df = pd.json_normalize(r.json()["_embedded"]["associations"], ["snps", ["genomicContexts"]], ["orPerCopyNum", "pvalue"], errors = "ignore")[["gene.geneName", "pvalue", "_links.snp.href", "orPerCopyNum"]].drop_duplicates(keep = "first")
-    COVID_df["_links.snp.href"] = COVID_df["_links.snp.href"].str.strip("{?projection}").str.split("Polymorphisms/").str[1]
-    COVID_df = COVID_df.loc[COVID_df["orPerCopyNum"].notna(), :].reset_index(drop = True)
-    COVID_df["orPerCopyNum"] = COVID_df["orPerCopyNum"].astype(float)
-    COVID_df = COVID_df.rename({
-        "gene.geneName": "gene_name",
-        "pvalue": "p-value",
-        "_links.snp.href": "snp",
-        "orPerCopyNum": "odds-ratio"
-    }, axis = 1)
-    COVID_df[["phewas phenotype", "gwas-associations"]] = "COVID-19"
-df_selected = df_selected.append(COVID_df).reset_index(drop = True)
-
-# extract data from Pharos
-query_string = """
-query AllTargets {
-    targets(
-        filter: { 
-          facets: [{
-              facet: "Target Development Level",
-                values: ["Tclin", "Tchem", "Tbio", "Tdark"]
-            }]
-        }
-    ) {
-        targets (top : 100000) {
-            sym
-            tdl
-        }
-    }
-}
-"""
-
-r = requests.post("https://pharos-api.ncats.io/graphql", json={"query": query_string})
-if r.status_code == 200:
-    df_druggable = pd.DataFrame(r.json()["data"]["targets"]["targets"]).drop_duplicates(keep = 'first').reset_index().drop('index', axis=1)
-
 
 # loading logo
 col1, col2 = st.columns((4, 1))
@@ -188,9 +139,71 @@ st.title("StarGazer: Multi-omics evidence-based drug target prioritization")
 
 select = st.sidebar.selectbox('Search by', ["--", 'Gene', 'Variant', 'PheWAS', 'GWAS', 'GWAS_PheWAS Union', 'GWAS_PheWAS Intersection', "Protein-protein Interaction", 'Disease Target Prioritization'], key='1')
 
+if 'count' not in st.session_state:
+    st.session_state.count = 0
+    
+    # initialising app
+    path = os.getcwd()
+
+    # import dataset
+    df = pd.read_csv(path + "/assets/phewas-catalog.csv")
+
+    # fill na with "Unknown"
+    df['gene_name'] = df['gene_name'].fillna("UNKNOWN")
+    df_selected = df[["gene_name", "snp", "phewas phenotype", "p-value", "odds-ratio", "gwas-associations"]]
+
+    # Adding COVID-19 module
+    full_url = "https://www.ebi.ac.uk/gwas/rest/api/efoTraits/MONDO_0100096/associations?projection=associationByEfoTrait"
+    r = requests.get(full_url, json={})
+    if r.status_code == 200:
+        COVID_df = pd.json_normalize(r.json()["_embedded"]["associations"], ["snps", ["genomicContexts"]], ["orPerCopyNum", "pvalue"], errors = "ignore")[["gene.geneName", "pvalue", "_links.snp.href", "orPerCopyNum"]].drop_duplicates(keep = "first")
+        COVID_df["_links.snp.href"] = COVID_df["_links.snp.href"].str.strip("{?projection}").str.split("Polymorphisms/").str[1]
+        COVID_df = COVID_df.loc[COVID_df["orPerCopyNum"].notna(), :].reset_index(drop = True)
+        COVID_df["orPerCopyNum"] = COVID_df["orPerCopyNum"].astype(float)
+        COVID_df = COVID_df.rename({
+            "gene.geneName": "gene_name",
+            "pvalue": "p-value",
+            "_links.snp.href": "snp",
+            "orPerCopyNum": "odds-ratio"
+        }, axis = 1)
+        COVID_df[["phewas phenotype", "gwas-associations"]] = "COVID-19"
+    df_selected = df_selected.append(COVID_df).reset_index(drop = True)
+    df_selected.to_csv(path + "/assets/df_selected.csv")
+
+    # extract data from Pharos
+    query_string = """
+    query AllTargets {
+        targets(
+            filter: { 
+              facets: [{
+                  facet: "Target Development Level",
+                    values: ["Tclin", "Tchem", "Tbio", "Tdark"]
+                }]
+            }
+        ) {
+            targets (top : 100000) {
+                sym
+                tdl
+            }
+        }
+    }
+    """
+
+    r = requests.post("https://pharos-api.ncats.io/graphql", json={"query": query_string})
+    if r.status_code == 200:
+        df_druggable = pd.DataFrame(r.json()["data"]["targets"]["targets"]).drop_duplicates(keep = 'first').reset_index().drop('index', axis=1)
+        df_druggable.to_csv(path + "/assets/df_druggable.csv")
+
+
+
+
 
 
 if select == "Gene":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the associated phenotypes of your genes of interest.")
     # sidebar -- gene & variant select boxs
     gene = sorted(df_selected["gene_name"].unique().tolist())
@@ -238,6 +251,10 @@ if select == "Gene":
             st.dataframe(df_variant_p_pro, height = 400)
 
 elif select == "Variant":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the associated phenotypes of your gene variants of interest.")
 
     # sidebar -- variant select box
@@ -284,6 +301,10 @@ elif select == "Variant":
             st.dataframe(df_variant_p_pro, height = 400)
 
 elif select == "GWAS":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the gene variants found in GWASs that are associated with your diseases of interest. It displays all associations, before separating associations into risk and protective. ")
 
     # extract diseases
@@ -442,6 +463,10 @@ elif select == "GWAS":
             st.write(df_disease_gwas_sub_pro)
             
 elif select == "PheWAS":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the gene variants found in PheWASs that are associated with your diseases of interest. It displays all associations, before separating associations into risk and protective.")
 
     # extract diseases
@@ -599,6 +624,10 @@ elif select == "PheWAS":
             st.write(df_disease_phewas_sub_pro)
 
 elif select == "GWAS_PheWAS Union":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the gene variants found in either GWASs or PheWASs or both that are associated with your diseases of interest. It displays all associations, before separating associations into risk and protective.")
     
     # extract diseases
@@ -758,6 +787,10 @@ elif select == "GWAS_PheWAS Union":
             st.write(df_disease_phewas_gwas_sub_pro)
     
 elif select == "GWAS_PheWAS Intersection":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the gene variants found in **both** GWASs and PheWASs that are associated with your diseases of interest. Gene variants that lie in this intersection are then further analysed in their druggability, association odds-ratio, protein-protein interactions and gene ontology term enrichment.")
 
     # extract diseases
@@ -1134,6 +1167,10 @@ elif select == "GWAS_PheWAS Intersection":
 
 
 elif select == "Protein-protein Interaction":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the protein-protein interaction networks and gene ontology enrichment for your diseases of interest.")
 
     # extract diseases
@@ -1315,6 +1352,10 @@ elif select == "Protein-protein Interaction":
         st.subheader("No data found. Please try selecting another disease!")
 
 elif select == "Disease Target Prioritization":
+    path = os.getcwd()
+    df_selected = pd.read_csv(path + "/assets/df_selected.csv")
+    df_druggable = pd.read_csv(path + "/assets/df_druggable.csv")
+    
     st.markdown("This dashboard shows the overall score for target prioritisation of genes with associations with your disease of interest. Features that contribute to the overall score include detection of association and association odds-ratio from a variety of studies (**OpenTargets** and the **PheWAS catalog**), network degree in protein-protein interaction networks (**STRING**), and level of druggability (**Pharos**). ")
 
     try:
