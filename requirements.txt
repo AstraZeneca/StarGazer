@@ -92,7 +92,7 @@ simplejson==3.17.5
 six==1.16.0
 sklearn==0.0
 smmap==5.0.0
-streamlit==1.1.0
+streamlit==1.11.1
 streamlit-echarts==0.3.0
 stvis==0.0.1
 tenacity==8.0.1
