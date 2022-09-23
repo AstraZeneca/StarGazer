@@ -67,7 +67,7 @@ plotly==5.3.1
 prettytable==2.2.1
 prometheus-client==0.11.0
 prompt-toolkit==3.0.21
-protobuf==3.19.0
+protobuf==3.19.5
 pyarrow==6.0.0
 pybase64==1.2.0
 pycparser==2.20
