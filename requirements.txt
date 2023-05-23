@@ -83,7 +83,7 @@ pyvis==0.1.9
 pywin32==302
 pywinpty==1.1.4
 pyzmq==22.3.0
-requests==2.26.0
+requests==2.31.0
 s3fs==2021.10.1
 scikit-learn==1.0.1
 scipy==1.7.1
