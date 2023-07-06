@@ -86,7 +86,7 @@ pyzmq==22.3.0
 requests==2.26.0
 s3fs==2021.10.1
 scikit-learn==1.0.1
-scipy==1.7.1
+scipy==1.10.0
 Send2Trash==1.8.0
 simplejson==3.17.5
 six==1.16.0
